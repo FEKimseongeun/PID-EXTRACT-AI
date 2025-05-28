@@ -1,0 +1,60 @@
+# Python 기본
+__pycache__/
+*.py[cod]
+*.so
+*.pyd
+*.pyo
+*.log
+*.tmp
+*.swp
+*.bak
+*.DS_Store
+
+# 가상환경
+venv/
+.env/
+.venv/
+
+# Jupyter 노트북
+.ipynb_checkpoints/
+
+# 모델 및 weight 파일
+*.pth
+*.pt
+*.tar
+*.onnx
+
+models
+./models
+./data
+data
+
+page_outputs
+./page_outputs
+
+# PaddleOCR 다운받은 모델
+src/pid_extractor/paddle_model
+src/pid_extractor/excel_result
+src/temp_inst_imgs
+src/excel_result
+inference/
+
+# 결과물 및 출력물
+*.xlsx
+*.csv
+*.xls
+*.pdf
+*.json
+
+# 개발 도구 별
+.vscode/
+.idea/
+
+# OS/에디터 관련 임시 파일
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+
+config.py
+src/pid_extractor/config.py

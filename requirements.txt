@@ -1,0 +1,10 @@
+torch
+transformers
+PyMuPDF
+paddleocr
+torchvision
+openpyxl
+pandas
+opencv-python
+matplotlib
+click
