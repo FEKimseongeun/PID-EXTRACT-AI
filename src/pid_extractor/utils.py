@@ -15,7 +15,7 @@ def pdf_to_images(pdf_path: str, out_dir: str, dpi: int = 200):
     """
     PDF를 이미지로 변환해 out_dir에 저장하고, 저장된 이미지 경로 리스트를 반환합니다.
     """
-    ensure_dir(out_dir)
+    #ensure_dir(out_dir)
     doc = fitz.open(pdf_path)
     zoom = dpi / 72
     mat = fitz.Matrix(zoom, zoom)
@@ -25,6 +25,7 @@ def pdf_to_images(pdf_path: str, out_dir: str, dpi: int = 200):
         out_path = os.path.join(out_dir, f"page_{i}.png")
         pix.save(out_path)
         paths.append(out_path)
+
     return paths
 
 
@@ -36,7 +37,6 @@ def write_sheets(data_dict: dict, out_xlsx: str):
         for sheet, df in data_dict.items():
             if not df.empty:
                 df.to_excel(writer, sheet_name=sheet, index=False)
-
 
 def clean_inst_tag_excel(input_excel: str,
                           output_excel: str,
@@ -68,3 +68,16 @@ def clean_inst_tag_excel(input_excel: str,
     df = df.drop(columns=['cleaned'])
     df.to_excel(output_excel, index=False)
     print(f"[DONE] cleaned INST_TAG 엑셀 저장: {output_excel}")
+
+
+def pdf_to_text_lines(pdf_path: str):
+    """
+    PyMuPDF로 PDF의 각 페이지에서 텍스트 줄 단위 추출 (공백 후처리 없이 그대로).
+    Yields (페이지 번호, 줄 텍스트)
+    """
+    import fitz
+    doc = fitz.open(pdf_path)
+    for page_num, page in enumerate(doc):
+        text = page.get_text()
+        for line in text.splitlines():
+            yield page_num + 1, line.strip()

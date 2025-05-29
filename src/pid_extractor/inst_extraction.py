@@ -1,21 +1,15 @@
-import os
 import torch
-import torch.nn as nn
-import torchvision.transforms as T
-import torchvision
-import numpy as np
-import cv2
+import pandas as pd
 from PIL import Image
-import matplotlib.pyplot as plt
-import torchvision.ops as ops  # NMS
-import pytesseract
-import re  # 정규식
+import os
+from . import config, utils
 from paddleocr import PaddleOCR
-import pandas as pd  # 엑셀 출력을 위해 필요
+from torchvision import transforms as T
+import numpy as np
+import torchvision.ops as ops
+import cv2
 
-# pytesseract.pytesseract.tesseract_cmd = r"C:\Program Files\Tesseract-OCR\tesseract.exe"
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
 
 #################################
 # 1) 클래스별 NMS 후처리 함수   #
@@ -133,7 +127,7 @@ def infer_sliding_window_with_ocr(
         overlap,
         iou_thresh,
         target_labels,
-        save_path='TEST_PID_IMG/detected_img'
+        save_path='../../data/imgs'
 ):
     """
     1) 슬라이싱 → 각 타일 추론
@@ -293,31 +287,19 @@ def save_results_to_excel(ocr_results, excel_path):
     print(f"[INFO] OCR 결과가 '{excel_path}' 파일로 저장되었습니다.")
 
 
-####################################################################
-# 6) 폴더 내 여러 이미지에 대해 추론+OCR 수행 후, 각 이미지별로 엑셀 파일 생성 #
-####################################################################
-if __name__ == "__main__":
-    # (1) 모델 로드
-    model_path = "../../models/faster_rcnn_pid_model_01.pth"
-    model = torch.load(model_path, map_location=device, weights_only=False)
-    model.eval()
-    model.to(device)
 
-    # (2) 처리할 이미지들이 들어 있는 폴더와 결과 저장 폴더 지정
-    image_folder = "../temp_inst_imgs"  # 처리할 이미지 폴더
-    output_folder = "../excel_result"
-    os.makedirs(output_folder, exist_ok=True)
+def extract_instrument_tags(pdf_path: str, output_excel: str):
+    model = torch.load(config.SYMBOL_MODEL_PATH, map_location=device, weights_only=False).to(device).eval()
+    temp_image_dir = "./temp_inst_imgs"
 
-    valid_extensions = [".png", ".jpg", ".jpeg"]
-    image_files = [f for f in os.listdir(image_folder) if os.path.splitext(f)[1].lower() in valid_extensions]
+    image_paths = utils.pdf_to_images(pdf_path, temp_image_dir, dpi=200)
+    records = []
 
-    # 각 이미지별로 OCR 결과를 개별 Excel 파일로 저장
-    for img_file in image_files:
-        image_path = os.path.join(image_folder, img_file)
-        print(f"\n==== Processing Image: {img_file} ====")
-        detected_img_path = os.path.join(output_folder, f"detected_{img_file}")
+    for image_path in image_paths:
+        img_filename = os.path.basename(image_path)
+        print(f"\n==== Processing Image: {img_filename} ====")
+        detected_img_path = os.path.join(temp_image_dir, f"detected_{img_filename}")
 
-        # 기존 파라미터 사용 (필요시 조정)
         detected_bboxes = infer_sliding_window_with_ocr(
             model=model,
             image_path=image_path,
@@ -330,26 +312,22 @@ if __name__ == "__main__":
         )
 
         if len(detected_bboxes) == 0:
-            print(f"[INFO] {img_file} 이미지에서 타겟 객체를 검출하지 못했습니다.")
+            print(f"[INFO] {img_filename} 이미지에서 타겟 객체를 검출하지 못했습니다.")
             continue
 
-        # 검출된 바운딩 박스 영역 크롭 및 OCR 수행
         cropped_imgs = crop_bounding_boxes_pil(detected_img_path, detected_bboxes)
         ocr_texts = perform_ocr_on_images(cropped_imgs, use_preprocessing=False)
 
-        # 이미지별 OCR 결과를 리스트에 기록 (한 이미지에 여러 박스 있을 경우)
         per_image_ocr_results = []
         for i, text in enumerate(ocr_texts):
-            bbox = detected_bboxes[i]  # (x1, y1, x2, y2)
+            bbox = detected_bboxes[i]
             per_image_ocr_results.append({
-                "Image": img_file,
+                "Image": img_filename,
                 "BBox": f"({bbox[0]}, {bbox[1]}, {bbox[2]}, {bbox[3]})",
                 "OCR_Result": text
             })
 
-        # 이미지 파일명 기반의 엑셀 파일명 생성 (예: ocr_results_sample.xlsx)
-        base_name = os.path.splitext(img_file)[0]
-        excel_output_path = os.path.join(output_folder, f"ocr_results_{base_name}.xlsx")
-        save_results_to_excel(per_image_ocr_results, excel_output_path)
+        records.extend(per_image_ocr_results)
 
-        print(f"[INFO] {img_file} 이미지에 대한 OCR 결과가 '{excel_output_path}'에 저장되었습니다.")
+    save_results_to_excel(records, output_excel)
+    print(f"[DONE] INST TAG 결과 저장: {output_excel}")
